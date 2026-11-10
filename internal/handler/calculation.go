@@ -7,7 +7,7 @@ import (
 	"tax-calculator/internal/tax"
 )
 
-// allowance คือค่าลดหย่อนหนึ่งรายการ (ยังไม่ได้ใช้จนถึง Step 6)
+// allowance คือค่าลดหย่อนหนึ่งรายการ
 type allowance struct {
 	AllowanceType string  `json:"allowanceType"`
 	Amount        float64 `json:"amount"`
