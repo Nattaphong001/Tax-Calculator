@@ -17,6 +17,15 @@ var brackets = []bracket{
 	{math.Inf(1), 0.35}, // ช่วงสุดท้ายไม่มีขอบบน
 }
 
+// PersonalAllowance คือค่าลดหย่อนส่วนตัว (ค่าคงที่)
+const PersonalAllowance = 60000
+
+// Calculate รับรายได้รวม คืนภาษี (หักลดหย่อนส่วนตัวแล้ว)
+func Calculate(totalIncome float64) float64 {
+	netIncome := totalIncome - PersonalAllowance
+	return CalculateTax(netIncome)
+}
+
 // CalculateTax รับเงินได้สุทธิ (หลังหักลดหย่อนแล้ว) แล้วคืนภาษีรวม
 func CalculateTax(netIncome float64) float64 {
 	if netIncome <= 0 {
