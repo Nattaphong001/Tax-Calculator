@@ -1,0 +1,11 @@
+# binary
+tax-calculator
+*.exe
+# env
+.env
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+# test coverage
+*.out
