@@ -34,7 +34,7 @@ func CalculateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := tax.Calculate(req.TotalIncome)
+	result := tax.Calculate(req.TotalIncome, req.WHT)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(calculationResponse{Tax: result})

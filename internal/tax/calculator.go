@@ -20,10 +20,10 @@ var brackets = []bracket{
 // PersonalAllowance คือค่าลดหย่อนส่วนตัว (ค่าคงที่)
 const PersonalAllowance = 60000
 
-// Calculate รับรายได้รวม คืนภาษี (หักลดหย่อนส่วนตัวแล้ว)
-func Calculate(totalIncome float64) float64 {
+// Calculate รับรายได้รวมและ WHT คืนภาษีที่ต้องจ่ายจริง (ติดลบ = ได้เงินคืน)
+func Calculate(totalIncome, wht float64) float64 {
 	netIncome := totalIncome - PersonalAllowance
-	return CalculateTax(netIncome)
+	return CalculateTax(netIncome) - wht
 }
 
 // CalculateTax รับเงินได้สุทธิ (หลังหักลดหย่อนแล้ว) แล้วคืนภาษีรวม
