@@ -20,5 +20,16 @@ func validate(req calculationRequest) string {
 			return "wht cannot be greater than totalIncome"
 		}
 	}
+	// ตรวจค่าลดหย่อนทีละรายการ: ตรวจ amount ก่อน type
+	// (ถ้าผิดทั้งคู่ จะแจ้งเรื่อง amount ก่อน)
+	for _, a := range req.Allowances {
+		if a.Amount < 0 {
+			return "allowance amount must be a non-negative number"
+		}
+		// ตอนนี้รองรับเฉพาะ donation
+		if a.AllowanceType != "donation" {
+			return "unknown allowanceType: " + a.AllowanceType
+		}
+	}
 	return ""
 }

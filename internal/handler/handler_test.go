@@ -181,3 +181,43 @@ func TestCalculateWithAllowances(t *testing.T) {
 		})
 	}
 }
+
+// ทดสอบ validation ของ allowances: amount ติดลบ และ allowanceType ที่ไม่รู้จัก ต้องได้ 400 พร้อมข้อความ error
+func TestCalculateAllowanceValidation(t *testing.T) {
+	router := NewRouter()
+
+	tests := []struct {
+		name     string
+		body     string
+		wantBody string
+	}{
+		{"negative donation amount",
+			`{"totalIncome":700000,"wht":0,"allowances":[{"allowanceType":"donation","amount":-5000}]}`,
+			`{"error":"allowance amount must be a non-negative number"}`},
+		{"unknown allowance type",
+			`{"totalIncome":700000,"wht":0,"allowances":[{"allowanceType":"kReceipt","amount":10000}]}`,
+			`{"error":"unknown allowanceType: kReceipt"}`},
+		{"empty allowance type",
+			`{"totalIncome":700000,"wht":0,"allowances":[{"allowanceType":"","amount":10000}]}`,
+			`{"error":"unknown allowanceType: "}`},
+		{"second allowance invalid",
+			`{"totalIncome":700000,"wht":0,"allowances":[{"allowanceType":"donation","amount":1000},{"allowanceType":"donation","amount":-1}]}`,
+			`{"error":"allowance amount must be a non-negative number"}`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/tax/calculations", strings.NewReader(tc.body))
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400", rec.Code)
+			}
+			got := strings.TrimSpace(rec.Body.String())
+			if got != tc.wantBody {
+				t.Errorf("body = %q, want %q", got, tc.wantBody)
+			}
+		})
+	}
+}
