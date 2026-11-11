@@ -11,7 +11,7 @@ type bracket struct {
 
 // Level คือภาษีของหนึ่งขั้นบันได
 type Level struct {
-	Level string  `json:"level"` 
+	Level string  `json:"level"`
 	Tax   float64 `json:"tax"`
 }
 
@@ -33,31 +33,9 @@ var brackets = []bracket{
 	{"2,000,001 ขึ้นไป", math.Inf(1), 0.35}, // ช่วงสุดท้ายไม่มีขอบบน → ใช้ Inf
 }
 
-// CalculateDetailed รับรายได้รวมและ WHT (ภาษีหัก ณ ที่จ่าย) คืนภาษีที่ต้องจ่ายจริงพร้อมรายละเอียดรายขั้น
+// Calculate รับรายได้รวมและ WHT คืนเฉพาะภาษีที่ต้องจ่ายจริง
 func Calculate(totalIncome, wht float64) float64 {
 	return CalculateDetailed(totalIncome, wht).Tax
-}
-
-// CalculateTax รับเงินได้สุทธิ (หลังหักลดหย่อนแล้ว) แล้วคืนภาษีรวม
-func CalculateTax(netIncome float64) float64 {
-	if netIncome <= 0 {
-		return 0
-	}
-
-	total := 0.0
-	lower := 0.0 // ขอบล่างของช่วงปัจจุบัน
-
-	for _, b := range brackets {
-		if netIncome <= lower {
-			break // เงินหมดแล้ว
-		}
-		// เงินส่วนที่ตกในช่วงนี้
-		portion := min(netIncome, b.upper) - lower
-		total += portion * b.rate
-		// อัปเดตขอบล่างสำหรับช่วงถัดไป
-		lower = b.upper
-	}
-	return total
 }
 
 // CalculateDetailed รับรายได้รวมและ WHT (ภาษีหัก ณ ที่จ่าย) คืนภาษีที่ต้องจ่ายจริงพร้อมรายละเอียดรายขั้น
