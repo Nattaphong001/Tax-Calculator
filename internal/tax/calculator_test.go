@@ -169,3 +169,40 @@ func TestCalculateDetailedWithAllowances(t *testing.T) {
 		})
 	}
 }
+
+// ทดสอบการปัดทศนิยม: ทุกค่าใน response ต้องมีไม่เกิน 2 ตำแหน่ง
+// และผลรวมของ taxLevel ต้องตรงกับ tax + wht พอดี
+func TestCalculateDetailedRounding(t *testing.T) {
+	tests := []struct {
+		name        string
+		totalIncome float64
+		wht         float64
+		allowances  []Allowance
+		wantTax     float64
+		wantLevels  []float64 // ภาษีรายช่วง ตามลำดับ 5 ช่วง
+	}{
+		{"cents in 15% bracket", 600000.33, 0, nil, 41000.05, []float64{0, 35000, 6000.05, 0, 0}},
+		{"cents with wht", 600000.33, 0.07, nil, 40999.98, []float64{0, 35000, 6000.05, 0, 0}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := CalculateDetailed(tc.totalIncome, tc.wht, tc.allowances)
+
+			if got.Tax != tc.wantTax {
+				t.Errorf("Tax = %v, want exactly %v", got.Tax, tc.wantTax)
+			}
+			sum := 0.0
+			for i, l := range got.TaxLevel {
+				if l.Tax != tc.wantLevels[i] {
+					t.Errorf("TaxLevel[%d] = %v, want exactly %v", i, l.Tax, tc.wantLevels[i])
+				}
+				sum += l.Tax
+			}
+			// sum ต้องตรงกับ tax + wht (เทียบด้วย tolerance เล็กมาก เพราะการบวก float ยังมีเศษระดับ 1e-9)
+			if math.Abs(sum-(got.Tax+tc.wht)) > 0.001 {
+				t.Errorf("sum of TaxLevel = %v, want tax+wht = %v", sum, got.Tax+tc.wht)
+			}
+		})
+	}
+}

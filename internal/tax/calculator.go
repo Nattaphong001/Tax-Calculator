@@ -58,7 +58,7 @@ func CalculateDetailed(totalIncome, wht float64, allowances []Allowance) Result 
 	for _, b := range brackets {
 		// เงินส่วนที่ตกในช่วงนี้ (ถ้าเป็นลบ → 0)
 		portion := math.Max(0, min(netIncome, b.upper)-lower)
-		levelTax := portion * b.rate
+		levelTax := round2(portion * b.rate)
 		// เพิ่ม Level ของช่วงนี้เข้าไปในผลลัพธ์
 		levels = append(levels, Level{Level: b.label, Tax: levelTax})
 		total += levelTax
@@ -78,4 +78,9 @@ func totalAllowance(allowances []Allowance) float64 {
 		}
 	}
 	return math.Min(donation, DonationCap)
+}
+
+// round2 ปัดเศษเป็นทศนิยม 2 ตำแหน่ง
+func round2(x float64) float64 {
+	return math.Round(x*100) / 100
 }
