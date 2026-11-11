@@ -1,0 +1,10 @@
+{
+  "totalIncome": 700000,
+  "wht": 0,
+  "allowances": [
+    {
+      "allowanceType": "donation",
+      "amount": 120000
+    }
+  ]
+}
