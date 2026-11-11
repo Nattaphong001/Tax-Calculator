@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,7 +24,7 @@ func TestRoutes(t *testing.T) {
 		{"health wrong method", http.MethodPost, "/health", "", http.StatusMethodNotAllowed, ""},
 		{"unknown path", http.MethodGet, "/nope", "", http.StatusNotFound, ""},
 		{"calc example 1", http.MethodPost, "/tax/calculations",
-			`{"totalIncome":750000,"wht":0,"allowances":[]}`, http.StatusOK, `{"tax":63500}`},
+			`{"totalIncome":750000,"wht":0,"allowances":[]}`, http.StatusOK, ""},
 		{"calc wrong method", http.MethodGet, "/tax/calculations", "", http.StatusMethodNotAllowed, ""},
 		{"calc malformed json", http.MethodPost, "/tax/calculations", `{bad`, http.StatusBadRequest, ""},
 	}
@@ -69,8 +71,8 @@ func TestCalculateValidation(t *testing.T) {
 		{"malformed json", `{bad`, 400, ""},
 		{"empty body", ``, 400, ""},
 		// สองเคสนี้ต้อง "ผ่าน" (ไม่ใช่ 400)
-		{"zero income is allowed", `{"totalIncome":0,"wht":0,"allowances":[]}`, 200, `{"tax":0}`},
-		{"wht equal to income is allowed", `{"totalIncome":100000,"wht":100000,"allowances":[]}`, 200, `{"tax":-100000}`},
+		{"zero income is allowed", `{"totalIncome":0,"wht":0,"allowances":[]}`, 200, ""},
+		{"wht equal to income is allowed", `{"totalIncome":100000,"wht":100000,"allowances":[]}`, 200, ""},
 	}
 
 	for _, tc := range tests {
@@ -95,5 +97,43 @@ func TestCalculateValidation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+func TestCalculateReturnsTaxLevel(t *testing.T) {
+	router := NewRouter()
+
+	body := `{"totalIncome":750000,"wht":0,"allowances":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/tax/calculations", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var got struct {
+		Tax      float64 `json:"tax"`
+		TaxLevel []struct {
+			Level string  `json:"level"`
+			Tax   float64 `json:"tax"`
+		} `json:"taxLevel"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response is not valid JSON: %v (body = %q)", err, rec.Body.String())
+	}
+
+	wantLabels := []string{"0-150,000", "150,001-500,000", "500,001-1,000,000", "1,000,001-2,000,000", "2,000,001 ขึ้นไป"}
+	wantTaxes := []float64{0, 35000, 28500, 0, 0}
+
+	if math.Abs(got.Tax-63500) > 0.01 {
+		t.Errorf("tax = %v, want 63500", got.Tax)
+	}
+	if len(got.TaxLevel) != len(wantLabels) {
+		t.Fatalf("len(taxLevel) = %d, want %d", len(got.TaxLevel), len(wantLabels))
+	}
+	for i := range wantLabels {
+		if got.TaxLevel[i].Level != wantLabels[i] || math.Abs(got.TaxLevel[i].Tax-wantTaxes[i]) > 0.01 {
+			t.Errorf("taxLevel[%d] = %+v, want {%s %v}", i, got.TaxLevel[i], wantLabels[i], wantTaxes[i])
+		}
 	}
 }

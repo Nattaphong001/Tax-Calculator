@@ -20,11 +20,6 @@ type calculationRequest struct {
 	Allowances  []allowance `json:"allowances"`  // รายการค่าลดหย่อนภาษี
 }
 
-// calculationResponse คือ JSON ที่ Server ตอบกลับไป
-type calculationResponse struct {
-	Tax float64 `json:"tax"` // ภาษีที่ต้องจ่าย
-}
-
 // CalculateHandler รับ POST /tax/calculations
 func CalculateHandler(w http.ResponseWriter, r *http.Request) {
 	var req calculationRequest
@@ -47,10 +42,10 @@ func CalculateHandler(w http.ResponseWriter, r *http.Request) {
 		wht = *req.WHT
 	}
 
-	// เรียก tax.Calculate() เพื่อคำนวณภาษี
-	result := tax.Calculate(*req.TotalIncome, wht)
+	// เรียก tax.CalculateDetailed() เพื่อคำนวณภาษีพร้อมรายละเอียดรายขั้น
+	result := tax.CalculateDetailed(*req.TotalIncome, wht)
 
 	// ส่ง response กลับไปยัง client เป็น JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(calculationResponse{Tax: result})
+	json.NewEncoder(w).Encode(result)
 }
