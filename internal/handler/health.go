@@ -5,10 +5,12 @@ import (
 	"net/http"
 )
 
-// HealthHandler ตอบว่า server ยังทำงานอยู่
+// HealthHandler ตรวจสอบและส่งกลับสถานะการทำงานของเซิร์ฟเวอร์
+// w เขียน response กลับไปยัง client , r คือ request ที่ client ส่งมา
 func HealthHandler(w http.ResponseWriter, r *http.Request) {
+	// กำหนด Content-Type สำหรับ response เป็น application/json
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-	})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
