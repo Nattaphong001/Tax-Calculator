@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-func TestCalculateTax(t *testing.T) {
+func TestCalculateDetailedBySum(t *testing.T) {
 	tests := []struct {
 		name      string
-		netIncome float64
-		want      float64
+		netIncome float64 // เงินได้สุทธิ (หลังหักลดหย่อน)
+		want      float64 // ภาษีรวมที่คำนวณมือไว้แล้ว
 	}{
 		{"zero", 0, 0},
 		{"negative treated as zero", -1000, 0},
@@ -24,10 +24,19 @@ func TestCalculateTax(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := CalculateTax(tc.netIncome)
+			// ฟังก์ชันรับรายได้รวม จึงบวกลดหย่อนกลับเข้าไปให้ได้เงินได้สุทธิตามต้องการ
+			got := CalculateDetailed(tc.netIncome+PersonalAllowance, 0)
+
+			sum := 0.0
+			for _, l := range got.TaxLevel {
+				sum += l.Tax
+			}
 			// เทียบ float ด้วย tolerance ไม่ใช้ == เพราะ 0.1 และ 0.15 เก็บเป็นเลขฐานสองไม่ได้พอดี
-			if math.Abs(got-tc.want) > 0.01 {
-				t.Errorf("CalculateTax(%v) = %v, want %v", tc.netIncome, got, tc.want)
+			if math.Abs(sum-tc.want) > 0.01 {
+				t.Errorf("sum of TaxLevel = %v, want %v", sum, tc.want)
+			}
+			if math.Abs(got.Tax-tc.want) > 0.01 {
+				t.Errorf("Tax = %v, want %v", got.Tax, tc.want)
 			}
 		})
 	}
@@ -55,5 +64,63 @@ func TestCalculate(t *testing.T) {
 				t.Errorf("Calculate(%v, %v) = %v, want %v", tc.totalIncome, tc.wht, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestCalculateDetailed(t *testing.T) {
+	got := CalculateDetailed(750000, 0)
+
+	wantLevels := []Level{
+		{"0-150,000", 0},
+		{"150,001-500,000", 35000},
+		{"500,001-1,000,000", 28500},
+		{"1,000,001-2,000,000", 0},
+		{"2,000,001 ขึ้นไป", 0},
+	}
+
+	if math.Abs(got.Tax-63500) > 0.01 {
+		t.Errorf("Tax = %v, want 63500", got.Tax)
+	}
+	if len(got.TaxLevel) != len(wantLevels) {
+		t.Fatalf("len(TaxLevel) = %d, want %d", len(got.TaxLevel), len(wantLevels))
+	}
+	for i, w := range wantLevels {
+		g := got.TaxLevel[i]
+		if g.Level != w.Level || math.Abs(g.Tax-w.Tax) > 0.01 {
+			t.Errorf("TaxLevel[%d] = %+v, want %+v", i, g, w)
+		}
+	}
+}
+
+func TestCalculateDetailedWithWHT(t *testing.T) {
+	got := CalculateDetailed(600000, 15000)
+
+	// tax คือภาษีหลังหัก WHT แต่ taxLevel รวมกันได้ภาษีก่อนหัก WHT
+	if math.Abs(got.Tax-26000) > 0.01 {
+		t.Errorf("Tax = %v, want 26000", got.Tax)
+	}
+	sum := 0.0
+	for _, l := range got.TaxLevel {
+		sum += l.Tax
+	}
+	if math.Abs(sum-41000) > 0.01 {
+		t.Errorf("sum of TaxLevel = %v, want 41000", sum)
+	}
+}
+
+func TestCalculateDetailedLowIncome(t *testing.T) {
+	// รายได้ต่ำกว่าลดหย่อน: เงินได้สุทธิติดลบ ทุกช่วงต้องเป็น 0 แต่ยังต้องมีครบ 5 ช่วง
+	got := CalculateDetailed(50000, 3000)
+
+	if len(got.TaxLevel) != 5 {
+		t.Fatalf("len(TaxLevel) = %d, want 5", len(got.TaxLevel))
+	}
+	for i, l := range got.TaxLevel {
+		if l.Tax != 0 {
+			t.Errorf("TaxLevel[%d].Tax = %v, want 0", i, l.Tax)
+		}
+	}
+	if math.Abs(got.Tax-(-3000)) > 0.01 {
+		t.Errorf("Tax = %v, want -3000 (refund)", got.Tax)
 	}
 }
