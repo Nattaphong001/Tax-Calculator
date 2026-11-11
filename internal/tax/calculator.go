@@ -21,8 +21,17 @@ type Result struct {
 	TaxLevel []Level `json:"taxLevel"`
 }
 
+// Allowance คือค่าลดหย่อนหนึ่งรายการ
+type Allowance struct {
+	Type   string
+	Amount float64
+}
+
 // PersonalAllowance คือค่าลดหย่อนส่วนตัว (ค่าคงที่)
 const PersonalAllowance = 60000
+
+// DonationCap คือเพดานค่าลดหย่อนเงินบริจาค
+const DonationCap = 100000
 
 // ขอบบนและอัตราภาษีของแต่ละช่วง (เรียงจากน้อยไปมาก)
 var brackets = []bracket{
@@ -33,14 +42,14 @@ var brackets = []bracket{
 	{"2,000,001 ขึ้นไป", math.Inf(1), 0.35}, // ช่วงสุดท้ายไม่มีขอบบน → ใช้ Inf
 }
 
-// Calculate รับรายได้รวมและ WHT คืนเฉพาะภาษีที่ต้องจ่ายจริง
-func Calculate(totalIncome, wht float64) float64 {
-	return CalculateDetailed(totalIncome, wht).Tax
+// Calculate รับรายได้รวม WHT และค่าลดหย่อน คืนเฉพาะภาษีที่ต้องจ่ายจริง
+func Calculate(totalIncome, wht float64, allowances []Allowance) float64 {
+	return CalculateDetailed(totalIncome, wht, allowances).Tax
 }
 
-// CalculateDetailed รับรายได้รวมและ WHT (ภาษีหัก ณ ที่จ่าย) คืนภาษีที่ต้องจ่ายจริงพร้อมรายละเอียดรายขั้น
-func CalculateDetailed(totalIncome, wht float64) Result {
-	netIncome := totalIncome - PersonalAllowance
+// CalculateDetailed รับรายได้รวม WHT และค่าลดหย่อน คืนภาษีที่ต้องจ่ายจริงพร้อมรายละเอียดรายขั้น
+func CalculateDetailed(totalIncome, wht float64, allowances []Allowance) Result {
+	netIncome := totalIncome - PersonalAllowance - totalAllowance(allowances)
 	levels := make([]Level, 0, len(brackets))
 	total := 0.0
 	lower := 0.0
@@ -58,4 +67,15 @@ func CalculateDetailed(totalIncome, wht float64) Result {
 	}
 
 	return Result{Tax: total - wht, TaxLevel: levels}
+}
+
+// totalAllowance รวมค่าลดหย่อนจากรายการ โดยรวมเงินบริจาคก่อนแล้วค่อยตัดเพดาน
+func totalAllowance(allowances []Allowance) float64 {
+	donation := 0.0
+	for _, a := range allowances {
+		if a.Type == "donation" {
+			donation += a.Amount
+		}
+	}
+	return math.Min(donation, DonationCap)
 }

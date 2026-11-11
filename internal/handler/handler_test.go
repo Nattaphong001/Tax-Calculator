@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// ทดสอบเส้นทางและ HTTP method: /health, path ที่ไม่มี, method ผิด และ JSON ที่พัง
 func TestRoutes(t *testing.T) {
 	router := NewRouter()
 
@@ -49,6 +50,8 @@ func TestRoutes(t *testing.T) {
 	}
 }
 
+// ทดสอบ validation ของ totalIncome และ wht: เคสที่ต้องได้ 400 พร้อมข้อความ error
+// และเคสขอบ (รายได้ 0, wht เท่ากับรายได้) ที่ต้องผ่านด้วย 200
 func TestCalculateValidation(t *testing.T) {
 	router := NewRouter()
 
@@ -88,6 +91,7 @@ func TestCalculateValidation(t *testing.T) {
 			if tc.wantBody != "" && got != tc.wantBody {
 				t.Errorf("body = %q, want %q", got, tc.wantBody)
 			}
+			// ทุกเคส 400 ต้องตอบเป็น JSON รูปแบบ {"error":"..."}
 			if tc.wantStatus == 400 {
 				if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 					t.Errorf("Content-Type = %q, want application/json", ct)
@@ -99,6 +103,9 @@ func TestCalculateValidation(t *testing.T) {
 		})
 	}
 }
+
+// ทดสอบว่า response มี taxLevel ครบ 5 ช่วง (รายได้ 750,000)
+// แปลง JSON กลับเป็น struct แล้วเทียบด้วย tolerance เพราะเลข float อาจมีเศษทศนิยม
 func TestCalculateReturnsTaxLevel(t *testing.T) {
 	router := NewRouter()
 
@@ -135,5 +142,42 @@ func TestCalculateReturnsTaxLevel(t *testing.T) {
 		if got.TaxLevel[i].Level != wantLabels[i] || math.Abs(got.TaxLevel[i].Tax-wantTaxes[i]) > 0.01 {
 			t.Errorf("taxLevel[%d] = %+v, want {%s %v}", i, got.TaxLevel[i], wantLabels[i], wantTaxes[i])
 		}
+	}
+}
+
+// ทดสอบการคำนวณเมื่อมีค่าลดหย่อนเงินบริจาค: เกินเพดาน 100,000, มี WHT และ allowances ว่าง
+func TestCalculateWithAllowances(t *testing.T) {
+	router := NewRouter()
+
+	tests := []struct {
+		name    string
+		body    string
+		wantTax float64
+	}{
+		{"donation over cap", `{"totalIncome":700000,"wht":0,"allowances":[{"allowanceType":"donation","amount":120000}]}`, 41000},
+		{"example 4 income, capped", `{"totalIncome":850000,"wht":0,"allowances":[{"allowanceType":"donation","amount":150000}]}`, 63500},
+		{"donation with wht", `{"totalIncome":700000,"wht":10000,"allowances":[{"allowanceType":"donation","amount":120000}]}`, 31000},
+		{"empty allowances", `{"totalIncome":750000,"wht":0,"allowances":[]}`, 63500},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/tax/calculations", strings.NewReader(tc.body))
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200 (body = %s)", rec.Code, rec.Body.String())
+			}
+			var got struct {
+				Tax float64 `json:"tax"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("invalid JSON: %v", err)
+			}
+			if math.Abs(got.Tax-tc.wantTax) > 0.01 {
+				t.Errorf("tax = %v, want %v", got.Tax, tc.wantTax)
+			}
+		})
 	}
 }

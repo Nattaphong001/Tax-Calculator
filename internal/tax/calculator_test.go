@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// ทดสอบว่าผลรวมของ taxLevel เท่ากับภาษีรวม ในแต่ละช่วงเงินได้สุทธิ (ตั้งแต่ 0 จนถึงช่วง 35%)
 func TestCalculateDetailedBySum(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -25,7 +26,7 @@ func TestCalculateDetailedBySum(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// ฟังก์ชันรับรายได้รวม จึงบวกลดหย่อนกลับเข้าไปให้ได้เงินได้สุทธิตามต้องการ
-			got := CalculateDetailed(tc.netIncome+PersonalAllowance, 0)
+			got := CalculateDetailed(tc.netIncome+PersonalAllowance, 0, nil)
 
 			sum := 0.0
 			for _, l := range got.TaxLevel {
@@ -42,6 +43,7 @@ func TestCalculateDetailedBySum(t *testing.T) {
 	}
 }
 
+// ทดสอบ Calculate: ภาษีสุทธิหลังหัก WHT รวมถึงกรณี WHT มากกว่าภาษี (ได้เงินคืน เป็นค่าติดลบ)
 func TestCalculate(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -59,7 +61,7 @@ func TestCalculate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Calculate(tc.totalIncome, tc.wht)
+			got := Calculate(tc.totalIncome, tc.wht, nil)
 			if math.Abs(got-tc.want) > 0.01 {
 				t.Errorf("Calculate(%v, %v) = %v, want %v", tc.totalIncome, tc.wht, got, tc.want)
 			}
@@ -67,8 +69,9 @@ func TestCalculate(t *testing.T) {
 	}
 }
 
+// ทดสอบว่า taxLevel ครบ 5 ช่วง พร้อมป้ายช่วงและภาษีของแต่ละช่วง (ตัวอย่างรายได้ 750,000)
 func TestCalculateDetailed(t *testing.T) {
-	got := CalculateDetailed(750000, 0)
+	got := CalculateDetailed(750000, 0, nil)
 
 	wantLevels := []Level{
 		{"0-150,000", 0},
@@ -92,8 +95,9 @@ func TestCalculateDetailed(t *testing.T) {
 	}
 }
 
+// ทดสอบกรณีมี WHT: ภาษีหลังหัก WHT ต้องลดลง แต่ taxLevel รวมกันได้ภาษีก่อนหัก WHT
 func TestCalculateDetailedWithWHT(t *testing.T) {
-	got := CalculateDetailed(600000, 15000)
+	got := CalculateDetailed(600000, 15000, nil)
 
 	// tax คือภาษีหลังหัก WHT แต่ taxLevel รวมกันได้ภาษีก่อนหัก WHT
 	if math.Abs(got.Tax-26000) > 0.01 {
@@ -108,9 +112,10 @@ func TestCalculateDetailedWithWHT(t *testing.T) {
 	}
 }
 
+// ทดสอบกรณีเงินได้สุทธิติดลบ: รายได้รวมต่ำกว่าค่าลดหย่อนส่วนตัว
 func TestCalculateDetailedLowIncome(t *testing.T) {
 	// รายได้ต่ำกว่าลดหย่อน: เงินได้สุทธิติดลบ ทุกช่วงต้องเป็น 0 แต่ยังต้องมีครบ 5 ช่วง
-	got := CalculateDetailed(50000, 3000)
+	got := CalculateDetailed(50000, 3000, nil)
 
 	if len(got.TaxLevel) != 5 {
 		t.Fatalf("len(TaxLevel) = %d, want 5", len(got.TaxLevel))
@@ -122,5 +127,45 @@ func TestCalculateDetailedLowIncome(t *testing.T) {
 	}
 	if math.Abs(got.Tax-(-3000)) > 0.01 {
 		t.Errorf("Tax = %v, want -3000 (refund)", got.Tax)
+	}
+}
+
+// ทดสอบค่าลดหย่อนหลายกรณี: ไม่มี, บริจาค 0, บริจาคไม่เกินเพดาน, บริจาคเกินเพดาน, หลายรายการรวมกัน, มี WHT, รายได้สุทธิติดลบ
+func TestCalculateDetailedWithAllowances(t *testing.T) {
+	tests := []struct {
+		name        string
+		totalIncome float64
+		wht         float64
+		allowances  []Allowance
+		want        float64
+	}{
+		{"nil allowances", 750000, 0, nil, 63500},
+		{"donation zero", 750000, 0, []Allowance{{"donation", 0}}, 63500},
+		{"donation under cap", 700000, 0, []Allowance{{"donation", 50000}}, 48500},
+		{"donation exactly at cap", 700000, 0, []Allowance{{"donation", 100000}}, 41000},
+		{"donation over cap is capped", 700000, 0, []Allowance{{"donation", 120000}}, 41000},
+		{"over cap, example 4 income", 850000, 0, []Allowance{{"donation", 150000}}, 63500},
+		{"several donations are summed then capped", 700000, 0,
+			[]Allowance{{"donation", 60000}, {"donation", 60000}}, 41000},
+		{"donation with wht", 700000, 10000, []Allowance{{"donation", 120000}}, 31000},
+		{"donation makes net income negative", 100000, 0, []Allowance{{"donation", 50000}}, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := CalculateDetailed(tc.totalIncome, tc.wht, tc.allowances)
+
+			sum := 0.0
+			for _, l := range got.TaxLevel {
+				sum += l.Tax
+			}
+			if math.Abs(got.Tax-tc.want) > 0.01 {
+				t.Errorf("Tax = %v, want %v", got.Tax, tc.want)
+			}
+			// taxLevel รวมกันได้ภาษีก่อนหัก WHT
+			if math.Abs(sum-(tc.want+tc.wht)) > 0.01 {
+				t.Errorf("sum of TaxLevel = %v, want %v", sum, tc.want+tc.wht)
+			}
+		})
 	}
 }

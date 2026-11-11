@@ -42,8 +42,14 @@ func CalculateHandler(w http.ResponseWriter, r *http.Request) {
 		wht = *req.WHT
 	}
 
+	// แปลงค่าลดหย่อนจาก type ของ handler เป็น type ของ package tax
+	allowances := make([]tax.Allowance, 0, len(req.Allowances))
+	for _, a := range req.Allowances {
+		allowances = append(allowances, tax.Allowance{Type: a.AllowanceType, Amount: a.Amount})
+	}
+
 	// เรียก tax.CalculateDetailed() เพื่อคำนวณภาษีพร้อมรายละเอียดรายขั้น
-	result := tax.CalculateDetailed(*req.TotalIncome, wht)
+	result := tax.CalculateDetailed(*req.TotalIncome, wht, allowances)
 
 	// ส่ง response กลับไปยัง client เป็น JSON
 	w.Header().Set("Content-Type", "application/json")
