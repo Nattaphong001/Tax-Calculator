@@ -8,7 +8,7 @@ type bracket struct {
 	rate  float64 // อัตราภาษีของช่วงนี้
 }
 
-// ขั้นบันไดเก็บเป็นข้อมูล ไม่ hardcode ใน if/else
+// ขอบบนและอัตราภาษีของแต่ละช่วง (เรียงจากน้อยไปมาก)
 var brackets = []bracket{
 	{150000, 0.00},
 	{500000, 0.10},
@@ -20,7 +20,7 @@ var brackets = []bracket{
 // PersonalAllowance คือค่าลดหย่อนส่วนตัว (ค่าคงที่)
 const PersonalAllowance = 60000
 
-// Calculate รับรายได้รวมและ WHT คืนภาษีที่ต้องจ่ายจริง (ติดลบ = ได้เงินคืน)
+// Calculate รับรายได้รวมและ WHT (ภาษีหัก ณ ที่จ่าย) คืนภาษีที่ต้องจ่ายจริง (ติดลบ = ได้เงินคืน)
 func Calculate(totalIncome, wht float64) float64 {
 	netIncome := totalIncome - PersonalAllowance
 	return CalculateTax(netIncome) - wht
@@ -39,8 +39,11 @@ func CalculateTax(netIncome float64) float64 {
 		if netIncome <= lower {
 			break // เงินหมดแล้ว
 		}
-		portion := min(netIncome, b.upper) - lower // เงินส่วนที่ตกในช่วงนี้
+		// เงินส่วนที่ตกในช่วงนี้
+		portion := min(netIncome, b.upper) - lower
+		// คำนวณภาษีของช่วงนี้
 		total += portion * b.rate
+		// อัปเดตขอบล่างสำหรับช่วงถัดไป
 		lower = b.upper
 	}
 	return total
