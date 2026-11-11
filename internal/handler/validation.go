@@ -6,7 +6,6 @@ func validate(req calculationRequest) string {
 	if req.TotalIncome == nil {
 		return "totalIncome is required"
 	}
-	// TotalIncome ต้องเป็น positive number (>0)
 	if *req.TotalIncome < 0 {
 		return "totalIncome must be a positive number"
 	}
@@ -19,6 +18,9 @@ func validate(req calculationRequest) string {
 		if *req.WHT > *req.TotalIncome {
 			return "wht cannot be greater than totalIncome"
 		}
+	}
+	if req.Allowances == nil {
+		return "allowances is required and must be an array"
 	}
 	// ตรวจค่าลดหย่อนทีละรายการ: ตรวจ amount ก่อน type
 	// (ถ้าผิดทั้งคู่ จะแจ้งเรื่อง amount ก่อน)
