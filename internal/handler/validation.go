@@ -1,0 +1,24 @@
+package handler
+
+// validate ตรวจ request คืนข้อความ error หรือ "" ถ้าผ่าน
+func validate(req calculationRequest) string {
+	// TotalIncome เป็น required field ถ้าไม่ส่งมาจะเป็น nil
+	if req.TotalIncome == nil {
+		return "totalIncome is required"
+	}
+	// TotalIncome ต้องเป็น positive number (>0)
+	if *req.TotalIncome < 0 {
+		return "totalIncome must be a positive number"
+	}
+	// WHT (ภาษีหัก ณ ที่จ่าย) เป็น optional ถ้าไม่ส่งมาถือเป็น 0
+	if req.WHT != nil {
+		if *req.WHT < 0 {
+			return "wht must be a non-negative number"
+		}
+		// WHT ต้องไม่มากกว่า TotalIncome
+		if *req.WHT > *req.TotalIncome {
+			return "wht cannot be greater than totalIncome"
+		}
+	}
+	return ""
+}
