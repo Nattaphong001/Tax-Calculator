@@ -22,11 +22,11 @@ func TestCalculateTax(t *testing.T) {
 		{"into 35% bracket", 2500000, 485000},
 	}
 
-	for _, tc := range tests { 
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			got := CalculateTax(tc.netIncome)
 			// เทียบ float ด้วย tolerance ไม่ใช้ == เพราะ 0.1 และ 0.15 เก็บเป็นเลขฐานสองไม่ได้พอดี
-			if math.Abs(got-tc.want) > 0.01 { 
+			if math.Abs(got-tc.want) > 0.01 {
 				t.Errorf("CalculateTax(%v) = %v, want %v", tc.netIncome, got, tc.want)
 			}
 		})
